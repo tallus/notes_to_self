@@ -65,20 +65,23 @@ clear-notes erases the logfile so you don't get notification, it leaves the actu
 requires bash and git i.e any unix/unix clone (i.e. Linux, OS X etc) You might need to instal git on you system.
 
 It also require you to have somewhere where you can host a remote git repository.
+
 To set this up do something like:
+
 On your remote host
-   % mkdir notes_to_self.git
-   % cd notes_to_self.git
-   % git --bare init
+
+    % mkdir notes_to_self.git
+    % cd notes_to_self.git
+    % git --bare init
 
 On your local host
+
     % git clone -o origin ssh://path/to/notes_to_self.git
     % git add remote origin ssh://path/to/notes_to_self.git
     % add-note
 
-
 ### TODO
-Allow selective deletion of notes
-Display last note only option
-Change get-notes to output summary note summary note... rather than summary summary... note note...
+* Allow selective deletion of notes
+* Display last note only option
+* Change get-notes to output summary note summary note... rather than summary summary... note note...
 
