@@ -1,0 +1,140 @@
+#!/bin/bash
+
+#    Copyright Paul Munday 2013
+
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+configfile=$HOME/.nts.cfg
+
+#Functions
+help(){
+cat <<EOF 
+
+usage: $0 [OPTION]...Summary
+Clears log file & the note file 
+-h			prints this message
+-t  [TYPE]              clear notes of [TYPE]
+Clears the log file so check_file will not report any old notes, and erases any notes 
+present. Summary is optional. Default is 'Erased notes [TYPE]'.
+EOF
+
+    # if $1 exists and is a number 0..255 return that otherwise return 0
+    if [[ -n $1 && $(echo {0..255}) =~ $1 ]]; then
+            exit $1
+    else
+            exit 0
+    fi
+}
+
+# process option arguments
+while getopts "h" option; do		# w: place variable following w in $OPTARG
+	case "$option" in
+		h) help;;
+                t)         
+                    nts_type=$OPTARG;
+                    shift $((OPTIND-1));
+                    if [[ ${conf[$nts_type]} ]]; then
+                        ntsfile="${conf[$nts_type]}"
+                    else
+                        echo "$nts_type not defined"
+                        echo "you will need to add it to  $HOME/$configfile"
+                        exit 2
+                    fi
+                    ;;
+		[?])  echo "bad option supplied" ; 
+			help;;	
+	esac
+done
+
+# read configuration file
+declare -A conf
+read_conf(){
+    local file=$1
+    if [[ -e $HOME/$file ]]; then
+        while read line; do
+            if [[ ! $line =~ "^ *#" ]]; then
+                a=( $line )
+                conf[${a[0]}]=$a[1]}
+            fi
+        done < $HOME/$file
+    fi
+}
+
+read_conf $configfile
+
+# define config values
+# directory where notes are stored
+if [[ ${conf[ntsdir]} ]]; then
+    ntsdir="${conf[ntsdir]}"
+    if [[ ! -e $ntsdir ]]; then
+        ntsdir=$HOME/$ntsdir
+    fi
+    if [[ -d $ntsdir  ]]; then
+        echo "invalid directory defined in $HOME/$configfile"
+        exit 4
+    fi
+else
+    ntsdir="$HOME/notes_to_self"
+fi
+# file to edit
+if [[ $ntsfile ]]; then
+    ntsfile="${ntsdir}/$ntsfile"
+elif [[ ${conf[defaultfile]} ]]; then
+    ntsfile="${ntsdir}/${conf[defaultfile]}"
+else
+    ntsfile="${ntsdir}/index.txt"
+fi
+
+if [[ -w $ntsfile ]]; then
+    echo "can not write to $ntsfile! Does it exist?"
+    exit 4
+fi
+# remote repository
+if [[ ${conf[gitremote]} ]]; then
+    remote="${conf[gitremote]}"
+else
+    remote='origin'
+fi
+
+# summary
+if [[ $@ ]]; then
+    ntsmsg="$@"
+else
+    ntsmsg="Erased notes $nts_type"
+fi
+if [[ -w $logfile ]]; then
+    cat /dev/null >  $logfile
+else 
+    echo "could not write to $logfile"
+    exit 3
+fi
+if [[ -w $ntsfile ]]; then
+    cat /dev/null > $ntsfile
+else
+    echo "could not write to $ntsfile"
+    exit 3
+fi
+
+if 
+# commit changes
+cd $ntsdir
+if ! git commit -am "$ntsmsg"  &> /dev/null; then
+    echo "Failed to commit changes"
+    exit 4
+fi
+
+if ! git push $remote &>/dev/null; then
+    echo "failed to push to remote directory"
+    exit 4
+fi

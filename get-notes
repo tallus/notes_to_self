@@ -1,0 +1,122 @@
+#!/bin/bash
+
+#    Copyright Paul Munday 2013
+
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+configfile=$HOME/.nts.cfg
+
+#Functions
+help(){
+cat <<EOF 
+
+usage: $0 [OPTION]
+Clears log file & the outputs note file 
+-h			prints this message
+-p                      use pager
+-t  [TYPE]              display notes of [TYPE]
+Clears the log file so check_file will not report any old notes, and displays any notes.
+The pager can be set in $configfile, less is used by default. You can also set it to always use pager. Notes are not erased after reading.
+EOF
+
+    # if $1 exists and is a number 0..255 return that otherwise return 0
+    if [[ -n $1 && $(echo {0..255}) =~ $1 ]]; then
+            exit $1
+    else
+            exit 0
+    fi
+}
+
+# process option arguments
+while getopts "hpt:" option; do		# w: place variable following w in $OPTARG
+	case "$option" in
+		h) help;;
+                p) pager="true";;
+                t)         
+                    nts_type=$OPTARG;
+                    if [[ ${conf[$nts_type]} ]]; then
+                        ntsfile="${conf[$nts_type]}"
+                    else
+                        echo "$nts_type not defined"
+                        echo "you will need to add it to  $HOME/$configfile"
+                        exit 2
+                    fi
+                    ;;
+		[?])  echo "bad option supplied" ; 
+			help;;	
+	esac
+done
+
+# read configuration file
+declare -A conf
+read_conf(){
+    local file=$1
+    if [[ -e $HOME/$file ]]; then
+        while read line; do
+            if [[ ! $line =~ "^ *#" ]]; then
+                a=( $line )
+                conf[${a[0]}]=$a[1]}
+            fi
+        done < $HOME/$file
+    fi
+}
+
+read_conf $configfile
+
+# define config values
+# directory where notes are stored
+if [[ ${conf[ntsdir]} ]]; then
+    ntsdir="${conf[ntsdir]}"
+    if [[ ! -e $ntsdir ]]; then
+        ntsdir=$HOME/$ntsdir
+    fi
+    if [[ -d $ntsdir  ]]; then
+        echo "invalid directory defined in $HOME/$configfile"
+        exit 4
+    fi
+else
+    ntsdir="$HOME/notes_to_self"
+fi
+# file to display
+if [[ $ntsfile ]]; then
+    ntsfile="${ntsdir}/$ntsfile"
+elif [[ ${conf[defaultfile]} ]]; then
+    ntsfile="${ntsdir}/${conf[defaultfile]}"
+else
+    ntsfile="${ntsdir}/index.txt"
+fi
+if [[  ${conf[page_always]} &&  ${conf[page_always]} != "no" ]]; then
+    pager="yes"
+fi
+
+# display then erase summary
+echo "Summary:"
+awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}'  $logfile
+if [[ -w $logfile ]]; then
+    cat /dev/null >  $logfile
+else 
+    echo "could not erase $logfile"
+    exit 3 
+fi
+
+if [[ $pager ]] ; then
+    if [[ ${conf[pager]} ]]; then
+        pager=${conf[pager]}
+        else pager=less
+    fi
+    $pager $ntsfile
+else
+    cat $ntsfile
+fi
+

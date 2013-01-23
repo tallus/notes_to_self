@@ -1,0 +1,174 @@
+#!/bin/bash
+
+#    Copyright Paul Munday 2013
+
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+configfile=$HOME/.nts.cfg
+
+# FUNCTIONS
+help(){
+cat <<EOF 
+
+usage: $0 [OPTIONS] [NOTE]
+Add a note to self
+-s  [SUMMARY]           Supply summary as argument. 
+-S                      Summary is the same as the note.
+-t  [TYPE]              Add a note of type.. see  below for more details.
+-h                      prints this message
+
+Add a note to self. You may optionally add the note after any arguments given. 
+Otherwise you will be prompted for one along with a summary. Hitting return 
+when prompted will make the summary the same as the note. The summary is used
+as a git commit message and will be shown when check_note is called. 
+
+You may specify a type of note as defined in $HOME/.nts.cfg to direct the note
+to something other than the default file.
+
+You might find it usefull to create aliases to note conf. e.g.
+alias add_book='add-note -t book'
+
+The readline library is used for text entry so you can use emacs/vi key 
+bindings as set in your shell.
+
+EOF
+
+    # if $1 exists and is a number 0..255 return that otherwise return 0
+    if [[ -n $1 && $(echo {0..255}) =~ $1 ]]; then
+            exit $1
+    else
+            exit 0
+    fi
+}        
+
+# read configuration file
+declare -A conf
+read_conf(){
+    local file=$1
+    if [[ -e $HOME/$file ]]; then
+        while read line; do
+            if [[ ! $line =~ "^ *#" ]]; then
+                a=( $line )
+                conf[${a[0]}]=$a[1]}
+            fi
+        done < $HOME/$file
+    fi
+}
+
+
+#MAIN
+
+read_conf $configfile
+
+# process command line options
+while getopts "hSs:t:" opt; do
+    case $opt in
+        h) help;;
+        S) summary="note";;
+        s) 
+            ntsmsg=$OPTARG;
+            shift $((OPTIND-1));
+            ;;
+        t)
+            nts_type=$OPTARG;
+            shift $((OPTIND-1));
+            if [[ ${conf[$nts_type]} ]]; then
+                ntsfile="${conf[$nts_type]}"
+            else
+                echo "$nts_type not defined"
+                echo "you will need to add it to  $HOME/$configfile"
+                exit 2
+            fi
+            ;;
+        [?])  echo "bad option supplied" ; 
+		help;;	
+    esac
+done
+
+# define config values e.g. location of note file
+if [[ ${conf[ntsdir]} ]]; then
+    ntsdir="${conf[ntsdir]}"
+    if [[ ! -e $ntsdir ]]; then
+        ntsdir=$HOME/$ntsdir
+    fi
+    if [[ -d $ntsdir  ]]; then
+        echo "invalid directory defined in $HOME/$configfile"
+        exit 4
+    fi
+else
+    ntsdir="$HOME/notes_to_self"
+fi
+
+if [[ $ntsfile ]]; then
+    ntsfile="${ntsdir}/$ntsfile"
+elif [[ ${conf[defaultfile]} ]]; then
+    ntsfile="${ntsdir}/${conf[defaultfile]}"
+else
+    ntsfile="${ntsdir}/index.txt"
+fi
+
+if [[ -w $ntsfile ]]; then
+    echo "can not write to $ntsfile! Does it exist?"
+    exit 4
+fi
+
+if [[ ${conf[gitremote]} ]]; then
+    remote="${conf[gitremote]}"
+else
+    remote='origin'
+fi
+
+# if present read note from command line
+if [[ $@ ]]; then
+    nts="$@"
+fi
+
+# read note if not
+if [[  ! $nts ]]; then
+    while [[ true ]];do 
+        echo "Enter your note"
+        read -e nts
+        if [[ -z $nts ]]; then
+            echo $nts >> $ntsfile
+            echo >> $ntsfile
+            break
+        else
+            echo "note can't be blank!"
+        fi
+    done
+fi    
+
+# read summary
+if [[ ! $summary ]]; then # -S used 
+    echo "enter a summary for your note (or hit return)"
+    read -e ntsmsg
+fi
+if  [[ -z $ntsmsg ]]; then  # blank so same as note
+    ntsmsg=$nts
+fi
+
+# commit note
+cd $ntsdir
+if ! git commit -am "$ntsmsg" &> /dev/null; then
+    echo "Failed to commit note"
+    exit 4
+fi
+
+if ! git push $remote &>/dev/null; then
+    echo "failed to push to remote directory"
+    exit 4
+fi
+
+

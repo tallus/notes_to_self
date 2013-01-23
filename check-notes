@@ -1,0 +1,152 @@
+#!/bin/bash
+
+#    Copyright Paul Munday 2013
+
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+configfile=$HOME/.nts.cfg
+
+
+# FUNCTIONS
+help(){
+cat <<EOF 
+
+usage: $0 [OPTION]...
+Checks for notes
+-p          Print content of notes as well as summary
+-f          Force check of remote repository
+-h			prints this message
+
+This checks for notes and prints out the summary. By default it only checks the 
+remote repository if the last check was more than an hour ago unless the -f
+option was used.
+
+It returns 0 if new notes are present, 1 if only old notes, 2 if there are
+no notes. (4 for config error).
+
+You can adjust the time between checks by setting check time in $configfile.
+EOF
+
+    # if $1 exists and is a number 0..255 return that otherwise return 0
+    if [[ -n $1 && $(echo {0..255}) =~ $1 ]]; then
+            exit $1
+    else
+        exit 0
+    fi
+}
+
+# read configuration file
+declare -A conf
+read_conf(){
+    local file=$1
+    if [[ -e $HOME/$file ]]; then
+        while read line; do
+            if [[ ! $line =~ "^ *#" ]]; then
+                a=( $line )
+                conf[${a[0]}]=$a[1]}
+            fi
+        done < $HOME/$file
+    fi
+}
+
+# get a git log of all new notes then merge notes.
+get_new_notes(){
+    local log=$1
+    local notedir=$2
+    cd $notedir
+    git fetch $remote  &>/dev/null
+    local log_report="$(git --no-pager  log  HEAD..notes/master --oneline)"
+    if [[ -n $log_report ]]; then
+        echo $log_report > $log
+        git merge $remote/master &> /dev/null
+        return 0
+    else
+        return 1
+    fi
+}
+
+read_conf $configfile
+
+# define config values
+# location of 'log file'
+if [[ ${conf[logfile]} ]]; then
+    logfile="${conf[logfile]}"
+else
+    logfile="$HOME/.notes"
+fi
+# directory where  notes are stored
+if [[ ${conf[ntsdir]} ]]; then
+    ntsdir="${conf[ntsdir]}"
+    if [[ ! -e $ntsdir ]]; then
+        ntsdir=$HOME/$ntsdir
+    fi
+    if [[ -d $ntsdir  ]]; then
+        echo "invalid directory defined in $HOME/$configfile"
+        exit 4
+    fi
+else
+    ntsdir="$HOME/notes_to_self"
+fi
+# remote repository
+if [[ ${conf[gitremote]} ]]; then
+    remote="${conf[gitremote]}"
+else
+    remote='origin'
+fi
+# time between checks
+if [[ ${conf[checktime]} ]]; then
+    checktime=${conf[checktime]}
+else
+    checktime=3600
+fi
+
+# check for command line options or process by time
+while getopts "hpf" opt; do
+    case $opt in
+        h)  help;;
+        p)  print_notes="true";;
+        f) force="true";;
+        [?])  echo "bad option supplied" ; 
+            help;; 
+    esac
+done
+if [[ $force ]]; then
+        get_new_notes $logfile $ntsdir
+        new_notes=$?
+elif [[ ! -e  $logfile ]]; then
+        get_new_notes $logfile $ntsdir
+        new_notes=$?
+# check for notes if we haven't checked in $checktime
+elif [[  $(( $(date +%s) - $(stat -c %Y $logfile ))) -gt $checktime ]] ; then
+        get_new_notes $logfile $ntsdir
+        new_notes=$?
+fi
+
+
+exit_val=2             
+# if there were new notes
+if [[  $new_note ]]; then
+    echo "New Notes!"
+    exit_val=0  
+# print out summary of notes
+elif [[ -s $logfile ]]; then
+    echo "Notes available"
+    let exit_val=1
+fi
+if [[ $printnotes ]] ; then
+    awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}' $logfile
+fi
+
+# 0 if new notes are present, 1 if only old notes else 2 (4 for config error)
+exit $exit_val
