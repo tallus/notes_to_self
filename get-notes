@@ -62,15 +62,18 @@ done
 declare -A conf
 read_conf(){
     local file=$1
-    if [[ -e $HOME/$file ]]; then
+    regex="^ *#"
+    if [[ -e $file ]]; then
         while read line; do
-            if [[ ! $line =~ "^ *#" ]]; then
+            if [[ ! $line =~ $regex  && -n $line ]]; then
                 a=( $line )
-                conf[${a[0]}]=$a[1]}
+                conf[${a[0]}]=${a[1]}
             fi
-        done < $HOME/$file
+        done < $file
     fi
 }
+
+
 
 read_conf $configfile
 
@@ -81,7 +84,7 @@ if [[ ${conf[ntsdir]} ]]; then
     if [[ ! -e $ntsdir ]]; then
         ntsdir=$HOME/$ntsdir
     fi
-    if [[ -d $ntsdir  ]]; then
+    if [[ ! -d $ntsdir  ]]; then
         echo "invalid directory defined in $HOME/$configfile"
         exit 4
     fi
