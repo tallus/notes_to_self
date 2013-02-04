@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-configfile=$HOME/.nts.cfg
+configfile="$HOME/.nts.cfg"
 
 # FUNCTIONS
 help(){
@@ -57,13 +57,14 @@ EOF
 declare -A conf
 read_conf(){
     local file=$1
-    if [[ -e $HOME/$file ]]; then
+    regex="^ *#"
+    if [[ -e $file ]]; then
         while read line; do
-            if [[ ! $line =~ "^ *#" ]]; then
+            if [[ ! $line =~ $regex  && -n $line ]]; then
                 a=( $line )
-                conf[${a[0]}]=$a[1]}
+                conf[${a[0]}]=${a[1]}
             fi
-        done < $HOME/$file
+        done < $file
     fi
 }
 
@@ -76,8 +77,10 @@ read_conf $configfile
 while getopts "hSs:t:" opt; do
     case $opt in
         h) help;;
-        S) summary="note";;
+        S) summary="note";
+           shift $((OPTIND-1));;
         s) 
+            summary="summary";
             ntsmsg=$OPTARG;
             shift $((OPTIND-1));
             ;;
@@ -88,7 +91,7 @@ while getopts "hSs:t:" opt; do
                 ntsfile="${conf[$nts_type]}"
             else
                 echo "$nts_type not defined"
-                echo "you will need to add it to  $HOME/$configfile"
+                echo "you will need to add it to  $configfile"
                 exit 2
             fi
             ;;
@@ -103,8 +106,8 @@ if [[ ${conf[ntsdir]} ]]; then
     if [[ ! -e $ntsdir ]]; then
         ntsdir=$HOME/$ntsdir
     fi
-    if [[ -d $ntsdir  ]]; then
-        echo "invalid directory defined in $HOME/$configfile"
+    if [[ ! -d $ntsdir  ]]; then
+        echo "invalid directory defined in $configfile"
         exit 4
     fi
 else
@@ -119,13 +122,13 @@ else
     ntsfile="${ntsdir}/index.txt"
 fi
 
-if [[ -w $ntsfile ]]; then
+if [[ ! -w $ntsfile ]]; then
     echo "can not write to $ntsfile! Does it exist?"
     exit 4
 fi
 
-if [[ ${conf[gitremote]} ]]; then
-    remote="${conf[gitremote]}"
+if [[ ${conf[remote]} ]]; then
+    remote="${conf[remote]}"
 else
     remote='origin'
 fi
@@ -140,9 +143,7 @@ if [[  ! $nts ]]; then
     while [[ true ]];do 
         echo "Enter your note"
         read -e nts
-        if [[ -z $nts ]]; then
-            echo $nts >> $ntsfile
-            echo >> $ntsfile
+        if [[ -n $nts ]]; then
             break
         else
             echo "note can't be blank!"
@@ -150,13 +151,17 @@ if [[  ! $nts ]]; then
     done
 fi    
 
+echo $nts >> $ntsfile
+echo >> $ntsfile
+
+
 # read summary
-if [[ ! $summary ]]; then # -S used 
+if [[ ! $summary ]]; then # -S or -s  used 
     echo "enter a summary for your note (or hit return)"
     read -e ntsmsg
 fi
 if  [[ -z $ntsmsg ]]; then  # blank so same as note
-    ntsmsg=$nts
+    ntsmsg="$nts"
 fi
 
 # commit note
