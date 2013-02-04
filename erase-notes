@@ -60,13 +60,14 @@ done
 declare -A conf
 read_conf(){
     local file=$1
-    if [[ -e $HOME/$file ]]; then
+    regex="^ *#"
+    if [[ -e $file ]]; then
         while read line; do
-            if [[ ! $line =~ "^ *#" ]]; then
+            if [[ ! $line =~ $regex  && -n $line ]]; then
                 a=( $line )
-                conf[${a[0]}]=$a[1]}
+                conf[${a[0]}]=${a[1]}
             fi
-        done < $HOME/$file
+        done < $file
     fi
 }
 
@@ -84,7 +85,7 @@ if [[ ${conf[ntsdir]} ]]; then
     if [[ ! -e $ntsdir ]]; then
         ntsdir=$HOME/$ntsdir
     fi
-    if [[ -d $ntsdir  ]]; then
+    if [[ ! -d $ntsdir  ]]; then
         echo "invalid directory defined in $HOME/$configfile"
         exit 4
     fi
@@ -100,13 +101,13 @@ else
     ntsfile="${ntsdir}/index.txt"
 fi
 
-if [[ -w $ntsfile ]]; then
+if [[ ! -w $ntsfile ]]; then
     echo "can not write to $ntsfile! Does it exist?"
     exit 4
 fi
 
-if [[ ${conf[gitremote]} ]]; then
-    remote="${conf[gitremote]}"
+if [[ ${conf[remote]} ]]; then
+    remote="${conf[remote]}"
 else
     remote='origin'
 fi
