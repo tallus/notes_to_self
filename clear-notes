@@ -45,19 +45,23 @@ while getopts "h" option; do		# w: place variable following w in $OPTARG
 	esac
 done
 
+
+
 # read configuration file
 declare -A conf
 read_conf(){
     local file=$1
-    if [[ -e $HOME/$file ]]; then
+    regex="^ *#"
+    if [[ -e $file ]]; then
         while read line; do
-            if [[ ! $line =~ "^ *#" ]]; then
+            if [[ ! $line =~ $regex  && -n $line ]]; then
                 a=( $line )
-                conf[${a[0]}]=$a[1]}
+                conf[${a[0]}]=${a[1]}
             fi
-        done < $HOME/$file
+        done < $file
     fi
 }
+
 
 read_conf $configfile
 
