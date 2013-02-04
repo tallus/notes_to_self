@@ -73,8 +73,6 @@ read_conf(){
     fi
 }
 
-
-
 read_conf $configfile
 
 # define config values
