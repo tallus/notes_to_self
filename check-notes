@@ -48,15 +48,16 @@ EOF
 
 # read configuration file
 declare -A conf
+regex="^ *#"
 read_conf(){
     local file=$1
-    if [[ -e $HOME/$file ]]; then
+    if [[ -e $file ]]; then
         while read line; do
-            if [[ ! $line =~ "^ *#" ]]; then
+            if [[ ! $line =~ $regex  && -n $line ]]; then
                 a=( $line )
-                conf[${a[0]}]=$a[1]}
+                conf[${a[0]}]=${a[1]}
             fi
-        done < $HOME/$file
+        done < $file
     fi
 }
 
@@ -64,9 +65,10 @@ read_conf(){
 get_new_notes(){
     local log=$1
     local notedir=$2
+    local remote=$3
     cd $notedir
     git fetch $remote  &>/dev/null
-    local log_report="$(git --no-pager  log  HEAD..notes/master --oneline)"
+    local log_report="$(git --no-pager  log  HEAD..$remote/master --oneline)"
     if [[ -n $log_report ]]; then
         echo $log_report > $log
         git merge $remote/master &> /dev/null
@@ -91,16 +93,16 @@ if [[ ${conf[ntsdir]} ]]; then
     if [[ ! -e $ntsdir ]]; then
         ntsdir=$HOME/$ntsdir
     fi
-    if [[ -d $ntsdir  ]]; then
-        echo "invalid directory defined in $HOME/$configfile"
+    if [[ ! -d $ntsdir  ]]; then
+        echo "invalid directory defined in $configfile"
         exit 4
     fi
 else
     ntsdir="$HOME/notes_to_self"
 fi
 # remote repository
-if [[ ${conf[gitremote]} ]]; then
-    remote="${conf[gitremote]}"
+if [[ ${conf[remote]} ]]; then
+    remote="${conf[remote]}"
 else
     remote='origin'
 fi
@@ -122,14 +124,14 @@ while getopts "hpf" opt; do
     esac
 done
 if [[ $force ]]; then
-        get_new_notes $logfile $ntsdir
+        get_new_notes $logfile $ntsdir $remote
         new_notes=$?
 elif [[ ! -e  $logfile ]]; then
-        get_new_notes $logfile $ntsdir
+        get_new_notes $logfile $ntsdir $remote
         new_notes=$?
 # check for notes if we haven't checked in $checktime
 elif [[  $(( $(date +%s) - $(stat -c %Y $logfile ))) -gt $checktime ]] ; then
-        get_new_notes $logfile $ntsdir
+        get_new_notes $logfile $ntsdir $remote
         new_notes=$?
 fi
 
