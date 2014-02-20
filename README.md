@@ -6,8 +6,8 @@ Command tools for the the terminally distracted. Leave a note to yourself.
 
 * Do you have a million tabs open and terminals covering every inch of your screen?
 * Afraid to close anything because you might never remember where you were?
-* Trying to work, but ooh shiny?
-* Are you, too, a command line fiend with ADHD?
+* Need to remember something but want to get back to work?
+
 
 **Notes To Self** is a series of small scripts to help you remember things and not get distracted.It uses the magic of git to store things so you can easily move between computers. It is designed to tie into the shell so you can easily get reminders. It store the notes in text files. You can define different types of notes in the config file by giving them  a name and the name of the file you want that sort of note stored. You can add arbitrary files to the notes directory. Just add a note and it will take care of the rest.
 
@@ -18,14 +18,23 @@ You are at work and you come across a program you want to install.
     % add-note -s 'Install note to self'  https://github.com/tallus/notes_to_self
 
 Back home you open a terminal and up pops a reminder
+
     New Notes
+
 You run 
-    %get-notes 
+
+    % get-notes
+
 and get back
-    Install note to self
+
+     Install note to self
+
      https://github.com/tallus/notes_to_self
+
 Now run
+
     % clear-notes
+
 and you won't get reminded again.
 
 You suddenly remember that book you wanted to buy but you are trying to work
